@@ -620,6 +620,23 @@ gimp_savable_value_save (GValue        *value,
       gimp_savable_print_element_end (state, tag_name);
     }
   else if (G_VALUE_HOLDS_OBJECT (value) &&
+           g_type_is_a (G_VALUE_TYPE (value), GIMP_TYPE_ITEM))
+    {
+      GimpItem  *item  = g_value_get_object (value);
+      GimpImage *image = gimp_item_get_image (item);
+
+      /* When saving an item stored in a property or a GimpValueArray,
+       * we only store it as a reference, assuming the item is saved in
+       * the file. This assumes this is an item from the same image.
+       */
+      g_return_if_fail (image == state->image);
+
+      gimp_savable_print_element (state, tag_name, NULL, NULL,
+                                  "type",       "%T", G_VALUE_TYPE (value),
+                                  "tattoo-ref", "%u", (guint) gimp_item_get_tattoo (item),
+                                  NULL);
+    }
+  else if (G_VALUE_HOLDS_OBJECT (value) &&
            g_type_is_a (G_VALUE_TYPE (value), GIMP_TYPE_SAVABLE))
     {
       GObject *object = g_value_get_object (value);

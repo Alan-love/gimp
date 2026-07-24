@@ -39,6 +39,7 @@ typedef struct _GimpSaveState GimpSaveState;
 struct _GimpSaveState
 {
   GOutputStream *output;
+  GimpImage     *image;
   GFile         *xcf_file;
   GHashTable    *icc_references;
   GQueue        *elements;

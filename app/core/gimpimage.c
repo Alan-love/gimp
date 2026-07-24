@@ -3137,6 +3137,7 @@ gimp_image_save_to_cache (GimpImage *image,
     }
 
   state.output         = output;
+  state.image          = image;
   state.xcf_file       = xcf_file;
   state.icc_references = NULL;
   state.elements       = g_queue_new ();
