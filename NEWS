@@ -127,7 +127,9 @@ Plug-Ins:
     - Added 32-bit precision support for export.
     - Import solid color ("SoCo") fill layers as pass-through group
       layers with effects.
-    - Initial text layer import support!
+    - Initial text layer import support! The warning that text layer
+      will be rasterized on import has been removed too.
+    - Be more robust by ignoring an empty layer comps list.
   * New import support for MacPaint images.
   * GBR: fix exporting grayscale GBRs with alpha channels.
   * file-raw-data: various code improvements.
@@ -197,6 +199,7 @@ Plug-Ins:
       delay in FLC export. The int argument is available
       non-interactively too as "default-delay" argument.
     - Store aspect ratio in file.
+  * ICO/CUR: Icons are now ordered large to small for better compliance.
 
 API:
 
@@ -222,6 +225,9 @@ API:
       + gimp_text_layer_is_dynamic
       + gimp_text_layer_get_layout_offsets
       + gimp_image_has_transparency
+      + gimp_font_get_by_postscript_name
+      + gimp_context_get_image
+      + gimp_context_set_image
   * libgimpui:
     - GimpProcedureDialog will now use the icon set on the associated
       GimpProcedure (likely only visible on platforms showing window
