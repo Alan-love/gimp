@@ -54,6 +54,7 @@
 #include "gimpdrawable-stroke.h"
 #include "gimppaintinfo.h"
 #include "gimppickable.h"
+#include "gimpsavable.h"
 #include "gimpstrokeoptions.h"
 
 #include "gimp-intl.h"
@@ -69,6 +70,7 @@ enum
 
 
 static void gimp_channel_pickable_iface_init (GimpPickableInterface *iface);
+static void gimp_channel_savable_iface_init  (GimpSavableInterface  *iface);
 
 static void       gimp_channel_finalize      (GObject           *object);
 
@@ -153,6 +155,10 @@ static gdouble   gimp_channel_get_opacity_at (GimpPickable        *pickable,
                                               gint                 x,
                                               gint                 y);
 
+
+static void       gimp_channel_savable_save  (GimpSavable         *savable,
+                                              GimpSaveState       *state);
+
 static gboolean   gimp_channel_real_boundary (GimpChannel         *channel,
                                               const GimpBoundSeg **segs_in,
                                               const GimpBoundSeg **segs_out,
@@ -205,9 +211,13 @@ static void      gimp_channel_buffer_changed (GeglBuffer          *buffer,
 
 G_DEFINE_TYPE_WITH_CODE (GimpChannel, gimp_channel, GIMP_TYPE_DRAWABLE,
                          G_IMPLEMENT_INTERFACE (GIMP_TYPE_PICKABLE,
-                                                gimp_channel_pickable_iface_init))
+                                                gimp_channel_pickable_iface_init)
+                         G_IMPLEMENT_INTERFACE (GIMP_TYPE_SAVABLE,
+                                                gimp_channel_savable_iface_init))
 
 #define parent_class gimp_channel_parent_class
+
+static GimpSavableInterface *parent_savable_iface = NULL;
 
 static guint channel_signals[LAST_SIGNAL] = { 0 };
 
@@ -324,6 +334,14 @@ static void
 gimp_channel_pickable_iface_init (GimpPickableInterface *iface)
 {
   iface->get_opacity_at = gimp_channel_get_opacity_at;
+}
+
+static void
+gimp_channel_savable_iface_init (GimpSavableInterface *iface)
+{
+  parent_savable_iface = g_type_interface_peek_parent (iface);
+
+  iface->save = gimp_channel_savable_save;
 }
 
 static void
@@ -1004,6 +1022,25 @@ gimp_channel_get_opacity_at (GimpPickable *pickable,
     }
 
   return value;
+}
+
+static void
+gimp_channel_savable_save (GimpSavable   *savable,
+                           GimpSaveState *state)
+{
+  GimpChannel *channel = GIMP_CHANNEL (savable);
+
+  gimp_savable_print_element_start (state, "channel",
+                                    "show-masked", "%b", gimp_channel_get_show_masked (channel),
+                                    NULL);
+
+  gimp_savable_color_save (channel->color, NULL, NULL, state);
+  gimp_savable_print_element (state, "opacity", "%f",
+                              gimp_channel_get_opacity (channel), NULL);
+
+  parent_savable_iface->save (savable, state);
+
+  gimp_savable_print_element_end (state, "channel");
 }
 
 static gboolean

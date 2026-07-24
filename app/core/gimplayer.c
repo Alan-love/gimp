@@ -56,7 +56,6 @@
 #include "gimplayer.h"
 #include "gimplayermask.h"
 #include "gimpobjectqueue.h"
-#include "gimpparasitelist.h"
 #include "gimppickable.h"
 #include "gimpprogress.h"
 #include "gimprasterizable.h"
@@ -1653,7 +1652,6 @@ gimp_layer_savable_save (GimpSavable   *savable,
   GimpImage              *image = gimp_item_get_image (GIMP_ITEM (layer));
   const Babl             *image_format;
   const Babl             *format;
-  GimpParasiteList       *parasites;
   GimpLayerMode           mode;
   GimpLayerColorSpace     space;
   GimpLayerCompositeMode  composite_mode;
@@ -1665,19 +1663,16 @@ gimp_layer_savable_save (GimpSavable   *savable,
 
   if (! drop_root)
     gimp_savable_print_element_start (state, "layer",
-                                      "name", "%s", gimp_object_get_name (GIMP_OBJECT (layer)),
                                       "type", "%t", layer,
                                       NULL);
 
   if (gimp_image_get_floating_selection (image) == layer)
-    gimp_savable_print_element (state, "floating", NULL, NULL, NULL);
-  else if (g_list_find (gimp_image_get_selected_layers (image), layer))
-    gimp_savable_print_element (state, "selected", NULL, NULL, NULL);
-
-  gimp_savable_print_element (state, "dimensions", NULL, NULL,
-                              "width",  "%d", gimp_item_get_width (GIMP_ITEM (layer)),
-                              "height", "%d", gimp_item_get_height (GIMP_ITEM (layer)),
-                              NULL);
+    {
+      GimpItem *item = GIMP_ITEM (gimp_layer_get_floating_sel_drawable (layer));
+      gimp_savable_print_element (state, "floating", NULL, NULL,
+                                  "attached-to", "%u", (guint) gimp_item_get_tattoo (item),
+                                  NULL);
+    }
 
   /* Do not store the format if it's the same as the image. */
   image_format = gimp_image_get_layer_format (image, TRUE);
@@ -1695,11 +1690,6 @@ gimp_layer_savable_save (GimpSavable   *savable,
 
   gimp_savable_print_element (state, "opacity", "%f",
                               gimp_layer_get_opacity (layer), NULL);
-  gimp_savable_print_element (state, "visible", "%b",
-                              gimp_item_get_visible (GIMP_ITEM (layer)), NULL);
-  gimp_savable_print_element (state, "color-tag", "%[GimpColorTag]",
-                              gimp_item_get_color_tag (GIMP_ITEM (layer)),
-                              NULL);
 
   mode = gimp_layer_get_mode (layer);
   gimp_savable_print_element (state, "mode", "%[GimpLayerMode]", mode, NULL);
@@ -1713,25 +1703,8 @@ gimp_layer_savable_save (GimpSavable   *savable,
   composite_mode = gimp_layer_get_composite_mode (layer);
   gimp_savable_composite_mode_save (composite_mode, mode, state);
 
-  gimp_savable_print_element (state, "tattoo", "%u",
-                              (guint) gimp_item_get_tattoo (GIMP_ITEM (layer)), NULL);
-
-  if (gimp_item_get_lock_content (GIMP_ITEM (layer))  ||
-      gimp_layer_get_lock_alpha (layer)               ||
-      gimp_item_get_lock_position (GIMP_ITEM (layer)) ||
-      gimp_item_get_lock_visibility (GIMP_ITEM (layer)))
-    {
-      gimp_savable_print_element_start (state, "locks", NULL);
-      if (gimp_item_get_lock_content (GIMP_ITEM (layer)))
-        gimp_savable_print_element (state, "lock-content", NULL, NULL, NULL);
-      if (gimp_layer_get_lock_alpha (layer))
-        gimp_savable_print_element (state, "lock-alpha", NULL, NULL, NULL);
-      if (gimp_item_get_lock_position (GIMP_ITEM (layer)))
-        gimp_savable_print_element (state, "lock-position", NULL, NULL, NULL);
-      if (gimp_item_get_lock_visibility (GIMP_ITEM (layer)))
-        gimp_savable_print_element (state, "lock-visibility", NULL, NULL, NULL);
-      gimp_savable_print_element_end (state, "locks");
-    }
+  if (gimp_layer_get_lock_alpha (layer))
+    gimp_savable_print_element (state, "lock-alpha", NULL, NULL, NULL);
 
   if (gimp_layer_get_mask (layer))
     {
@@ -1757,10 +1730,6 @@ gimp_layer_savable_save (GimpSavable   *savable,
 
       gimp_savable_print_element_end (state, "layers");
     }
-
-  parasites = gimp_item_get_parasites (GIMP_ITEM (layer));
-  if (gimp_parasite_list_length (parasites) > 0)
-    gimp_savable_save (GIMP_SAVABLE (parasites), state);
 
   if (! drop_root)
     gimp_savable_print_element_end (state, "layer");

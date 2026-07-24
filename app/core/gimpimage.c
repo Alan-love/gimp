@@ -1922,6 +1922,13 @@ gimp_image_savable_save (GimpSavable   *savable,
   for (; iter; iter = iter->next)
     gimp_savable_save (GIMP_SAVABLE (iter->data), state);
   gimp_savable_print_element_end (state, "layers");
+
+  gimp_savable_print_element_start (state, "channels", NULL);
+  iter = gimp_image_get_channel_iter (image);
+  for (; iter; iter = iter->next)
+    gimp_savable_save (GIMP_SAVABLE (iter->data), state);
+  gimp_savable_print_element_end (state, "channels");
+
   gimp_savable_print_element_end (state, "project");
 
   g_clear_pointer (&state->icc_references, g_hash_table_unref);
@@ -5276,7 +5283,7 @@ gimp_image_get_selected_items (GimpImage *image,
 {
   g_return_val_if_fail (GIMP_IS_IMAGE (image), NULL);
 
-  if (item_type == GIMP_TYPE_LAYER)
+  if (g_type_is_a (item_type, GIMP_TYPE_LAYER))
     {
       return gimp_image_get_selected_layers (image);
     }
