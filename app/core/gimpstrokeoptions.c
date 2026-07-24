@@ -36,6 +36,7 @@
 #include "gimpdashpattern.h"
 #include "gimppaintinfo.h"
 #include "gimpparamspecs.h"
+#include "gimpsavable.h"
 #include "gimpstrokeoptions.h"
 
 #include "paint/gimppaintoptions.h"
@@ -98,31 +99,38 @@ struct _GimpStrokeOptionsPrivate
         ((GimpStrokeOptionsPrivate *) gimp_stroke_options_get_instance_private ((GimpStrokeOptions *) (options)))
 
 
-static void   gimp_stroke_options_config_iface_init (gpointer      iface,
-                                                     gpointer      iface_data);
+static void   gimp_stroke_options_config_iface_init  (gpointer              iface,
+                                                      gpointer              iface_data);
+static void   gimp_stroke_options_savable_iface_init (GimpSavableInterface *iface);
 
-static void   gimp_stroke_options_finalize          (GObject      *object);
-static void   gimp_stroke_options_set_property      (GObject      *object,
-                                                     guint         property_id,
-                                                     const GValue *value,
-                                                     GParamSpec   *pspec);
-static void   gimp_stroke_options_get_property      (GObject      *object,
-                                                     guint         property_id,
-                                                     GValue       *value,
-                                                     GParamSpec   *pspec);
+static void   gimp_stroke_options_finalize           (GObject              *object);
+static void   gimp_stroke_options_set_property       (GObject              *object,
+                                                      guint                 property_id,
+                                                      const GValue         *value,
+                                                      GParamSpec           *pspec);
+static void   gimp_stroke_options_get_property       (GObject              *object,
+                                                      guint                 property_id,
+                                                      GValue               *value,
+                                                      GParamSpec           *pspec);
 
-static GimpConfig * gimp_stroke_options_duplicate   (GimpConfig   *config);
+static GimpConfig * gimp_stroke_options_duplicate    (GimpConfig           *config);
+
+static void         gimp_stroke_options_savable_save (GimpSavable          *savable,
+                                                      GimpSaveState        *state);
 
 
 G_DEFINE_TYPE_WITH_CODE (GimpStrokeOptions, gimp_stroke_options,
                          GIMP_TYPE_FILL_OPTIONS,
                          G_ADD_PRIVATE (GimpStrokeOptions)
                          G_IMPLEMENT_INTERFACE (GIMP_TYPE_CONFIG,
-                                                gimp_stroke_options_config_iface_init))
+                                                gimp_stroke_options_config_iface_init)
+                         G_IMPLEMENT_INTERFACE (GIMP_TYPE_SAVABLE,
+                                                gimp_stroke_options_savable_iface_init))
 
 #define parent_class gimp_stroke_options_parent_class
 
-static GimpConfigInterface *parent_config_iface = NULL;
+static GimpConfigInterface  *parent_config_iface  = NULL;
+static GimpSavableInterface *parent_savable_iface = NULL;
 
 static guint stroke_options_signals[LAST_SIGNAL] = { 0 };
 
@@ -236,6 +244,14 @@ gimp_stroke_options_config_iface_init (gpointer  iface,
     parent_config_iface = g_type_default_interface_peek (GIMP_TYPE_CONFIG);
 
   config_iface->duplicate = gimp_stroke_options_duplicate;
+}
+
+static void
+gimp_stroke_options_savable_iface_init (GimpSavableInterface *iface)
+{
+  parent_savable_iface = g_type_interface_peek_parent (iface);
+
+  iface->save = gimp_stroke_options_savable_save;
 }
 
 static void
@@ -389,6 +405,36 @@ gimp_stroke_options_duplicate (GimpConfig *config)
     }
 
   return GIMP_CONFIG (new_options);
+}
+
+static void
+gimp_stroke_options_savable_save (GimpSavable   *savable,
+                                  GimpSaveState *state)
+{
+  GimpStrokeOptions        *options = GIMP_STROKE_OPTIONS (savable);
+  GimpStrokeOptionsPrivate *private = GET_PRIVATE (options);
+  GArray                   *dash_info;
+  GimpValueArray           *dash_value_array;
+
+  gimp_savable_print_element_start (state, "stroke-options", NULL);
+
+  parent_savable_iface->save (savable, state);
+
+  gimp_savable_print_element (state, "line-width", "%f", private->width, NULL);
+  gimp_savable_print_element (state, "cap-style", "%[GimpCapStyle]", private->cap_style, NULL);
+  gimp_savable_print_element (state, "join-style", "%[GimpJoinStyle]", private->join_style, NULL);
+  gimp_savable_print_element (state, "miter-limit", "%f", private->miter_limit, NULL);
+
+  gimp_savable_print_element_start (state, "dash-pattern", NULL, NULL, NULL);
+  dash_info        = gimp_stroke_options_get_dash_info (options);
+  dash_value_array = gimp_dash_pattern_to_value_array (dash_info);
+  if (dash_value_array)
+    gimp_savable_value_array_save (dash_value_array, state);
+  gimp_savable_print_element_end (state, "dash-pattern");
+
+  gimp_savable_print_element_end (state, "stroke-options");
+
+  g_clear_pointer (&dash_value_array, gimp_value_array_unref);
 }
 
 

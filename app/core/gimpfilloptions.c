@@ -40,6 +40,7 @@
 #include "gimpfilloptions.h"
 #include "gimpimage.h"
 #include "gimppattern.h"
+#include "gimpsavable.h"
 
 #include "gimp-intl.h"
 
@@ -80,26 +81,32 @@ struct _GimpFillOptionsPrivate
         ((GimpFillOptionsPrivate *) gimp_fill_options_get_instance_private ((GimpFillOptions *) (options)))
 
 
-static void     gimp_fill_options_config_init  (GimpConfigInterface *iface);
+static void     gimp_fill_options_config_init        (GimpConfigInterface  *iface);
+static void     gimp_fill_options_savable_iface_init (GimpSavableInterface *iface);
 
-static void     gimp_fill_options_set_property (GObject             *object,
-                                                guint                property_id,
-                                                const GValue        *value,
-                                                GParamSpec          *pspec);
-static void     gimp_fill_options_get_property (GObject             *object,
-                                                guint                property_id,
-                                                GValue              *value,
-                                                GParamSpec          *pspec);
+static void     gimp_fill_options_set_property       (GObject              *object,
+                                                      guint                 property_id,
+                                                      const GValue         *value,
+                                                      GParamSpec           *pspec);
+static void     gimp_fill_options_get_property       (GObject              *object,
+                                                      guint                 property_id,
+                                                      GValue               *value,
+                                                      GParamSpec           *pspec);
 
-static gboolean gimp_fill_options_serialize    (GimpConfig          *config,
-                                                GimpConfigWriter    *writer,
-                                                gpointer             data);
+static gboolean gimp_fill_options_serialize          (GimpConfig           *config,
+                                                      GimpConfigWriter     *writer,
+                                                      gpointer              data);
+
+static void     gimp_fill_options_savable_save       (GimpSavable          *savable,
+                                                      GimpSaveState        *state);
 
 
 G_DEFINE_TYPE_WITH_CODE (GimpFillOptions, gimp_fill_options, GIMP_TYPE_CONTEXT,
                          G_ADD_PRIVATE (GimpFillOptions)
                          G_IMPLEMENT_INTERFACE (GIMP_TYPE_CONFIG,
-                                                gimp_fill_options_config_init))
+                                                gimp_fill_options_config_init)
+                         G_IMPLEMENT_INTERFACE (GIMP_TYPE_SAVABLE,
+                                                gimp_fill_options_savable_iface_init))
 
 
 static void
@@ -177,6 +184,12 @@ static void
 gimp_fill_options_config_init (GimpConfigInterface *iface)
 {
   iface->serialize = gimp_fill_options_serialize;
+}
+
+static void
+gimp_fill_options_savable_iface_init (GimpSavableInterface *iface)
+{
+  iface->save = gimp_fill_options_savable_save;
 }
 
 static void
@@ -278,6 +291,38 @@ gimp_fill_options_serialize (GimpConfig       *config,
                              gpointer          data)
 {
   return gimp_config_serialize_properties (config, writer);
+}
+
+static void
+gimp_fill_options_savable_save (GimpSavable   *savable,
+                                GimpSaveState *state)
+{
+  GimpFillOptions        *options = GIMP_FILL_OPTIONS (savable);
+  GimpFillOptionsPrivate *private = GET_PRIVATE (options);
+  GeglColor              *color;
+  GimpPattern            *pattern;
+
+  if (G_TYPE_FROM_INSTANCE (savable) == GIMP_TYPE_FILL_OPTIONS)
+    gimp_savable_print_element_start (state, "fill-options", NULL);
+
+  gimp_savable_print_element (state, "style",
+                              "%[GimpCustomStyle]", private->custom_style, NULL);
+  gimp_savable_print_element (state, "antialias", "%b", private->antialias, NULL);
+
+  color = gimp_context_get_foreground (GIMP_CONTEXT (options));
+  gimp_savable_print_element_start (state, "color", NULL);
+  if (color)
+    gimp_savable_color_save (color, NULL, NULL, state);
+  gimp_savable_print_element_end (state, "color");
+
+  pattern = gimp_context_get_pattern (GIMP_CONTEXT (options));
+  gimp_savable_print_element_start (state, "pattern", NULL);
+  if (pattern)
+    gimp_savable_save (GIMP_SAVABLE (pattern), state);
+  gimp_savable_print_element_end (state, "pattern");
+
+  if (G_TYPE_FROM_INSTANCE (savable) == GIMP_TYPE_FILL_OPTIONS)
+    gimp_savable_print_element_end (state, "fill-options");
 }
 
 
